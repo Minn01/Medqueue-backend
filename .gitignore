@@ -1,0 +1,69 @@
+# Node.js and npm
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn.lock
+package-lock.json
+
+# Build output
+dist/
+build/
+out/
+.next/  # Next.js
+public/build/  # Common for some static site generators
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Dependency caches
+.pnpm-store/
+bun.lockb  # Bun package manager
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+*.lcov
+test-results/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# Web-specific
+.eslintcache
+.prettierrc.cache
+stylelint-cache/
+dist-ssr/
+
+# Parcel (if used)
+.parcel-cache/
+
+# Vite (if used)
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Miscellaneous
+*.bak
+*.gho
+*.orig
+*.rej
