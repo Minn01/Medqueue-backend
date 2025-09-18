@@ -18,7 +18,7 @@ router.post('/book', async (req, res) => {
   const { patientId, doctorId, dateTime } = req.body;
   
   const result = await bookAppointment(patientId, doctorId, dateTime);
-  
+
   if (result.success) {
     res.status(201).json(result);
   } else {
@@ -103,6 +103,40 @@ router.post('/notifications/send', async (req, res) => {
     res.status(200).json(result);
   } else {
     res.status(400).json(result);
+  }
+});
+
+// Signup
+router.post('/signup', async (req, res) => {
+  const { name, email, password } = req.body;
+  try {
+    const existing = await Patient.findOne({ email });
+    if (existing) return res.status(400).json({ error: 'Email already exists' });
+
+    const patient = new Patient({ name, email, password });
+    await patient.save();
+
+    res.status(201).json({ id: patient._id, name: patient.name, email: patient.email });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Login
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const patient = await Patient.findOne({ email });
+    if (!patient) return res.status(400).json({ error: 'Patient not found' });
+
+    const match = await patient.comparePassword(password);
+    if (!match) return res.status(400).json({ error: 'Incorrect password' });
+
+    // Optional: JWT token
+    const token = jwt.sign({ id: patient._id }, 'your_jwt_secret', { expiresIn: '1h' });
+    res.status(200).json({ id: patient._id, name: patient.name, email: patient.email, token });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
