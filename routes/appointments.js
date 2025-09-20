@@ -10,7 +10,9 @@ const {
   generateQueueNumber,
   checkInPatient,
   updateDoctorAvailability,
-  sendNotification
+  sendNotification,
+  getPatientAppointments,
+  getPatientQueue
 } = require('../core-functions-db');
 
 // POST /api/appointments/book
@@ -106,38 +108,18 @@ router.post('/notifications/send', async (req, res) => {
   }
 });
 
-// Signup
-router.post('/signup', async (req, res) => {
-  const { name, email, password } = req.body;
-  try {
-    const existing = await Patient.findOne({ email });
-    if (existing) return res.status(400).json({ error: 'Email already exists' });
-
-    const patient = new Patient({ name, email, password });
-    await patient.save();
-
-    res.status(201).json({ id: patient._id, name: patient.name, email: patient.email });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// GET /api/appointments
+router.get('/', async (req, res) => {
+  const { patientId } = req.query;
+  const appointments = await getPatientAppointments(patientId);
+  res.status(200).json(appointments);
 });
 
-// Login
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const patient = await Patient.findOne({ email });
-    if (!patient) return res.status(400).json({ error: 'Patient not found' });
-
-    const match = await patient.comparePassword(password);
-    if (!match) return res.status(400).json({ error: 'Incorrect password' });
-
-    // Optional: JWT token
-    const token = jwt.sign({ id: patient._id }, 'your_jwt_secret', { expiresIn: '1h' });
-    res.status(200).json({ id: patient._id, name: patient.name, email: patient.email, token });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// GET /api/queue
+router.get('/queue', async (req, res) => {
+  const { patientId } = req.query;
+  const queue = await getPatientQueue(patientId);
+  res.status(200).json(queue);
 });
 
 module.exports = router;

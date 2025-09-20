@@ -4,6 +4,93 @@
 const Appointment = require('./models/Appointment');
 const Doctor = require('./models/Doctor');
 const Notification = require('./models/Notification');
+const Patient = require('./models/Patient')
+
+// Signup function
+async function signupPatient(patientName, patientEmail, patientPassword) {
+  try {
+    // Check if patient already exists
+    const existingPatient = await Patient.findOne({ email: patientEmail });
+    if (existingPatient) {
+      return {
+        success: false,
+        message: 'Patient with this email already exists'
+      };
+    }
+
+    // Create new patient
+    const newPatient = new Patient({
+      name: patientName,
+      email: patientEmail,
+      password: patientPassword // Will be automatically hashed by the pre-save hook
+    });
+
+    // Save to database
+    const savedPatient = await newPatient.save();
+
+    return {
+      success: true,
+      message: 'Patient registered successfully',
+      patient: {
+        id: savedPatient._id,
+        name: savedPatient.name,
+        email: savedPatient.email
+      }
+    };
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    return {
+      success: false,
+      message: 'Internal server error during signup'
+    };
+  }
+}
+
+// Login function
+async function loginPatient(patientEmail, patientPassword) {
+  try {
+    // Find patient by email
+    const patient = await Patient.findOne({ email: patientEmail });
+    if (!patient) {
+      return {
+        success: false,
+        message: 'Invalid email or password'
+      };
+    }
+
+    // Check password
+    const isPasswordValid = await patient.comparePassword(patientPassword);
+    if (!isPasswordValid) {
+      return {
+        success: false,
+        message: 'Invalid email or password'
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Login successful',
+      patient: {
+        id: patient._id,
+        name: patient.name,
+        email: patient.email
+      }
+    };
+
+  } catch (error) {
+    console.error('Login error:', error);
+    return {
+      success: false,
+      message: 'Internal server error during login'
+    };
+  }
+}
+
+module.exports = {
+  signupPatient,
+  loginPatient
+};
 
 // 1. Book Appointment Function (with Database)
 async function bookAppointment(patientId, doctorId, dateTime) {
@@ -442,6 +529,75 @@ function generateNotificationId() {
   return `NOT${timestamp}${random}`;
 }
 
+async function getDoctors() {
+  try {
+    const doctors = await Doctor.find({});
+    return doctors;
+  } catch (error) {
+    console.error('Error fetching doctors:', error);
+    return [];
+  }
+}
+
+async function getTimeSlots(doctorId, date) {
+  try {
+    const doctor = await Doctor.findOne({ doctorId });
+    if (!doctor) return [];
+
+    const schedule = doctor.schedules.find(s => s.date === date);
+    if (!schedule || !schedule.available) return [];
+
+    // Generate time slots (example logic)
+    const slots = [];
+    let currentTime = new Date(`2000-01-01T${schedule.startTime}`);
+    const endTime = new Date(`2000-01-01T${schedule.endTime}`);
+
+    while (currentTime < endTime) {
+      slots.push(currentTime.toTimeString().slice(0, 5));
+      currentTime.setMinutes(currentTime.getMinutes() + 30); // 30 min slots
+    }
+
+    return slots;
+  } catch (error) {
+    console.error('Error fetching time slots:', error);
+    return [];
+  }
+}
+
+async function getPatientQueue(patientId) {
+  try {
+    const appointments = await Appointment.find({ patientId, status: 'confirmed', checkedIn: true });
+    return appointments.map(app => ({
+      queueNumber: app.queueNumber,
+      waitingTime: 'N/A', // Calculate if needed
+      doctorName: 'Dr. ' + app.doctorId,
+      patientId: app.patientId
+    }));
+  } catch (error) {
+    console.error('Error fetching queue:', error);
+    return [];
+  }
+}
+
+async function getPatientAppointments(patientId) {
+  try {
+    const appointments = await Appointment.find({ patientId });
+    return appointments.map(app => ({
+      appointmentId: app.appointmentId,
+      doctorName: 'Dr. ' + app.doctorId,
+      dateTime: app.dateTime.toISOString().split('T')[0],
+      time: app.dateTime.toTimeString().slice(0, 5),
+      status: app.status,
+      queueNumber: app.queueNumber,
+      bookedAt: app.bookedAt.toISOString(),
+      patientId: app.patientId
+    }));
+  } catch (error) {
+    console.error('Error fetching appointments:', error);
+    return [];
+  }
+}
+
 // Export functions for use in other files
 module.exports = {
   bookAppointment,
@@ -450,5 +606,11 @@ module.exports = {
   generateQueueNumber,
   checkInPatient,
   updateDoctorAvailability,
-  sendNotification
+  sendNotification,
+  signupPatient,
+  loginPatient,
+  getDoctors,
+  getTimeSlots,
+  getPatientQueue,
+  getPatientAppointments,
 };

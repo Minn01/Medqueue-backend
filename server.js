@@ -26,6 +26,8 @@ app.use(express.json());
 
 // Import routes
 const appointmentRoutes = require('./routes/appointments');
+const userRoutes = require('./routes/user')
+const doctorRoutes = require('./routes/doctor')
 
 // Basic route for testing
 app.get('/', (req, res) => {
@@ -65,6 +67,8 @@ app.get('/api/test', (req, res) => {
 
 // Use appointment routes
 app.use('/api/appointments', appointmentRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/doctor', doctorRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
