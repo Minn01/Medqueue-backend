@@ -108,18 +108,40 @@ router.post('/notifications/send', async (req, res) => {
   }
 });
 
-// GET /api/appointments
-router.get('/', async (req, res) => {
-  const { patientId } = req.query;
-  const appointments = await getPatientAppointments(patientId);
-  res.status(200).json(appointments);
+// GET /api/appointments/patient/:patientId
+router.get('/patient/:patientId', async (req, res) => {
+  const { patientId } = req.params;
+  
+  try {
+    const appointments = await getPatientAppointments(patientId);
+    res.status(200).json({
+      success: true,
+      appointments: appointments
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching patient appointments'
+    });
+  }
 });
 
-// GET /api/queue
-router.get('/queue', async (req, res) => {
-  const { patientId } = req.query;
-  const queue = await getPatientQueue(patientId);
-  res.status(200).json(queue);
+// GET /api/appointments/queue/:patientId
+router.get('/queue/:patientId', async (req, res) => {
+  const { patientId } = req.params;
+  
+  try {
+    const queue = await getPatientQueue(patientId);
+    res.status(200).json({
+      success: true,
+      queue: queue
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching patient queue'
+    });
+  }
 });
 
 module.exports = router;

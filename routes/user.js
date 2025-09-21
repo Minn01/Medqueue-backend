@@ -26,7 +26,6 @@ router.post('/signup', async (req, res) => {
     res.status(400).json(result);
   }
 });
-// test
 router.post('/login', async (req, res) => {
   const { email, password } = req.body; 
 
