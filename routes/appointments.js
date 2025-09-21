@@ -12,7 +12,7 @@ const {
   updateDoctorAvailability,
   sendNotification,
   getPatientAppointments,
-  getPatientQueue
+  getTodaysQueueByDoctor,
 } = require('../core-functions-db');
 
 // POST /api/appointments/book
@@ -126,21 +126,14 @@ router.get('/patient/:patientId', async (req, res) => {
   }
 });
 
-// GET /api/appointments/queue/:patientId
-router.get('/queue/:patientId', async (req, res) => {
-  const { patientId } = req.params;
-  
+// GET /api/queue - Today's appointments grouped by doctor
+router.get('/queue', async (req, res) => {
   try {
-    const queue = await getPatientQueue(patientId);
-    res.status(200).json({
-      success: true,
-      queue: queue
-    });
+    const queueByDoctor = await getTodaysQueueByDoctor();
+    res.status(200).json(queueByDoctor);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching patient queue'
-    });
+    console.error('Error fetching queue:', error);
+    res.status(500).json({ error: 'Failed to fetch queue' });
   }
 });
 

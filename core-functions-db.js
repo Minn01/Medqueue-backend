@@ -92,7 +92,7 @@ module.exports = {
   loginPatient
 };
 
-// 1. Book Appointment Function (with Database)
+// 1. Book Appointment Function (with Database and Conflict Check)
 async function bookAppointment(patientId, doctorId, dateTime) {
   try {
     // Input validation
@@ -107,7 +107,6 @@ async function bookAppointment(patientId, doctorId, dateTime) {
     // Check if appointment time is in the future
     const appointmentDate = new Date(dateTime);
     const currentDate = new Date();
-    
     if (appointmentDate <= currentDate) {
       return {
         success: false,
@@ -116,9 +115,29 @@ async function bookAppointment(patientId, doctorId, dateTime) {
       };
     }
 
+    // Check for doctor scheduling conflicts
+    const conflictCheck = await checkDoctorAvailability(doctorId, appointmentDate);
+    if (!conflictCheck.available) {
+      return {
+        success: false,
+        message: conflictCheck.message,
+        appointmentId: null
+      };
+    }
+
+    // Check if patient already has an appointment at the same time
+    const patientConflict = await checkPatientConflict(patientId, appointmentDate);
+    if (patientConflict.hasConflict) {
+      return {
+        success: false,
+        message: "You already have an appointment scheduled at this time",
+        appointmentId: null
+      };
+    }
+
     // Generate unique appointment ID
     const appointmentId = generateAppointmentId();
-    
+
     // Create appointment in database
     const appointment = new Appointment({
       appointmentId,
@@ -155,6 +174,77 @@ async function bookAppointment(patientId, doctorId, dateTime) {
   }
 }
 
+// Helper function to check doctor availability
+async function checkDoctorAvailability(doctorId, requestedDateTime) {
+  try {
+    // Define appointment duration (30 minutes default)
+    const appointmentDuration = 30 * 60 * 1000; // 30 minutes in milliseconds
+    
+    // Calculate time window to check for conflicts
+    const startTime = new Date(requestedDateTime.getTime() - appointmentDuration);
+    const endTime = new Date(requestedDateTime.getTime() + appointmentDuration);
+
+    // Find conflicting appointments for this doctor
+    const conflictingAppointments = await Appointment.find({
+      doctorId: doctorId,
+      status: { $in: ['confirmed', 'completed'] }, // Don't check cancelled appointments
+      dateTime: {
+        $gte: startTime,
+        $lt: endTime
+      }
+    });
+
+    if (conflictingAppointments.length > 0) {
+      const conflictTime = conflictingAppointments[0].dateTime.toLocaleString();
+      return {
+        available: false,
+        message: `Doctor already has an appointment scheduled near this time (${conflictTime}). Please choose a different time slot.`
+      };
+    }
+
+    return {
+      available: true,
+      message: "Time slot is available"
+    };
+
+  } catch (error) {
+    return {
+      available: false,
+      message: "Error checking doctor availability: " + error.message
+    };
+  }
+}
+
+// Helper function to check patient conflicts
+async function checkPatientConflict(patientId, requestedDateTime) {
+  try {
+    // Check if patient has any appointment within 30 minutes of requested time
+    const appointmentDuration = 30 * 60 * 1000; // 30 minutes in milliseconds
+    const startTime = new Date(requestedDateTime.getTime() - appointmentDuration);
+    const endTime = new Date(requestedDateTime.getTime() + appointmentDuration);
+
+    const existingAppointment = await Appointment.findOne({
+      patientId: patientId,
+      status: { $in: ['confirmed', 'completed'] },
+      dateTime: {
+        $gte: startTime,
+        $lt: endTime
+      }
+    });
+
+    return {
+      hasConflict: !!existingAppointment,
+      conflictingAppointment: existingAppointment
+    };
+
+  } catch (error) {
+    return {
+      hasConflict: true, // Err on the side of caution
+      conflictingAppointment: null
+    };
+  }
+}
+
 // 2. Cancel Appointment Function (with Database)
 async function cancelAppointment(appointmentId) {
   try {
@@ -168,7 +258,7 @@ async function cancelAppointment(appointmentId) {
 
     // Find and update appointment in database
     const appointment = await Appointment.findOne({ appointmentId });
-    
+
     if (!appointment) {
       return {
         success: false,
@@ -216,7 +306,7 @@ async function modifyAppointment(appointmentId, newDateTime) {
 
     // Find appointment in database
     const appointment = await Appointment.findOne({ appointmentId });
-    
+
     if (!appointment) {
       return {
         success: false,
@@ -227,7 +317,7 @@ async function modifyAppointment(appointmentId, newDateTime) {
     // Check if new time is in the future
     const newAppointmentDate = new Date(newDateTime);
     const currentDate = new Date();
-    
+
     if (newAppointmentDate <= currentDate) {
       return {
         success: false,
@@ -270,7 +360,7 @@ async function generateQueueNumber(appointmentId) {
 
     // Find appointment in database
     const appointment = await Appointment.findOne({ appointmentId });
-    
+
     if (!appointment) {
       return {
         success: false,
@@ -331,7 +421,7 @@ async function checkInPatient(appointmentId) {
 
     // Find appointment in database
     const appointment = await Appointment.findOne({ appointmentId });
-    
+
     if (!appointment) {
       return {
         success: false,
@@ -363,7 +453,7 @@ async function checkInPatient(appointmentId) {
     appointment.checkedIn = true;
     appointment.checkedInAt = new Date();
     await appointment.save();
-    
+
     return {
       success: true,
       message: "Patient checked in successfully",
@@ -403,7 +493,7 @@ async function updateDoctorAvailability(doctorId, schedule) {
     // Validate schedule format
     const requiredFields = ['date', 'startTime', 'endTime', 'available'];
     const hasAllFields = requiredFields.every(field => schedule.hasOwnProperty(field));
-    
+
     if (!hasAllFields) {
       return {
         success: false,
@@ -413,7 +503,7 @@ async function updateDoctorAvailability(doctorId, schedule) {
 
     // Find or create doctor
     let doctor = await Doctor.findOne({ doctorId });
-    
+
     if (!doctor) {
       // Create new doctor if doesn't exist
       doctor = new Doctor({
@@ -579,6 +669,69 @@ async function getPatientQueue(patientId) {
   }
 }
 
+async function getTodaysQueueByDoctor() {
+  try {
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    const appointments = await Appointment.find({
+      status: 'confirmed',
+      dateTime: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      }
+    })
+      .sort({ dateTime: 1 }) // Order by appointment time
+      .exec();
+
+    // Group by doctor
+    const queuesByDoctor = {};
+
+    appointments.forEach((app, globalIndex) => {
+      if (!queuesByDoctor[app.doctorId]) {
+        queuesByDoctor[app.doctorId] = {
+          doctorId: app.doctorId,
+          doctorName: `Dr. ${app.doctorId}`, // You can populate this later
+          appointments: []
+        };
+      }
+
+      // Position within this doctor's queue
+      const doctorPosition = queuesByDoctor[app.doctorId].appointments.length + 1;
+
+      queuesByDoctor[app.doctorId].appointments.push({
+        position: doctorPosition,
+        queueNumber: app.queueNumber,
+        appointmentId: app.appointmentId,
+        patientId: app.patientId,
+        dateTime: app.dateTime,
+        checkedIn: app.checkedIn,
+        waitingTime: calculateWaitTime(doctorPosition - 1),
+        status: app.status
+      });
+    });
+
+    return Object.values(queuesByDoctor);
+  } catch (error) {
+    console.error('Error fetching today\'s queue by doctor:', error);
+    return [];
+  }
+}
+
+function calculateWaitTime(position) {
+  // Simple wait time calculation - 15 minutes per person ahead
+  const minutesPerPatient = 15;
+  const waitMinutes = position * minutesPerPatient;
+
+  if (waitMinutes === 0) return 'Now serving';
+  if (waitMinutes < 60) return `${waitMinutes} min`;
+
+  const hours = Math.floor(waitMinutes / 60);
+  const minutes = waitMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}min` : `${hours}h`;
+}
+
 async function getPatientAppointments(patientId) {
   try {
     const appointments = await Appointment.find({ patientId });
@@ -613,4 +766,5 @@ module.exports = {
   getTimeSlots,
   getPatientQueue,
   getPatientAppointments,
+  getTodaysQueueByDoctor,
 };
