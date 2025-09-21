@@ -4,7 +4,7 @@
 const Appointment = require('./models/Appointment');
 const Doctor = require('./models/Doctor');
 const Notification = require('./models/Notification');
-const Patient = require('./models/Patient')
+const Patient = require('./models/Patient');
 
 // Signup function
 async function signupPatient(patientName, patientEmail, patientPassword) {
@@ -87,11 +87,6 @@ async function loginPatient(patientEmail, patientPassword) {
   }
 }
 
-module.exports = {
-  signupPatient,
-  loginPatient
-};
-
 // 1. Book Appointment Function (with Database and Conflict Check)
 async function bookAppointment(patientId, doctorId, dateTime) {
   try {
@@ -138,10 +133,10 @@ async function bookAppointment(patientId, doctorId, dateTime) {
     // Generate unique appointment ID
     const appointmentId = generateAppointmentId();
 
-    // Create appointment in database
+    // Create appointment in database - USE THE ORIGINAL patientId, don't create new Patient record
     const appointment = new Appointment({
       appointmentId,
-      patientId,
+      patientId, // This should be the generated patientId from frontend
       doctorId,
       dateTime: appointmentDate,
       status: 'confirmed',
